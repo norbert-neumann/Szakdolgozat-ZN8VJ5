@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SZD_ZN8VJ5
+﻿
+namespace SZD_ZN8VJ5.Groups
 {
     public class PseudoGroup : Group
     {
@@ -12,8 +7,8 @@ namespace SZD_ZN8VJ5
             bool isNoise)
             : base(complexity)
         {
-            this.originX = 0;
-            this.originY = 0;
+            originX = 0;
+            originY = 0;
 
             this.field = new int[field.GetLength(0), field.GetLength(1)];
 
@@ -53,7 +48,7 @@ namespace SZD_ZN8VJ5
             {
                 for (int j = 0; j < width; j++)
                 {
-                    result[i, j] = this.field[i, j];
+                    result[i, j] = field[i, j];
                 }
             }
             return result;

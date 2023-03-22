@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using SZD_ZN8VJ5.Groups;
 
 namespace SZD_ZN8VJ5
 {
@@ -22,6 +17,8 @@ namespace SZD_ZN8VJ5
         public List<ARCObject> contains = new List<ARCObject>();
         public ARCObject noiseTo;
         public ARCObject containedBy;
+
+        public Visual _Visual;
 
         public static int ObjectCount = 0;
         public int objectIndex;
@@ -101,6 +98,8 @@ namespace SZD_ZN8VJ5
             this.width = width;
             this.height = height;
             this.regionToColor = regionToColor;
+
+            this._Visual = new Visual(this);
         }
 
         public bool LooksLike(ARCObject other)
@@ -136,6 +135,32 @@ namespace SZD_ZN8VJ5
             return slice;
         }
 
+        public int[,] FullVisual()
+        {
+            int[,] result = new int[30, 30];
+            for (int i = 0; i < 30; i++)
+            {
+                for (int j = 0; j < 30; j++)
+                {
+                    result[i, j] = -1;
+                }
+            }
+
+            int[,] slice = this.Group.Slice(width, height);
+            for (int i = 0; i < slice.GetLength(0); i++)
+            {
+                for (int j = 0; j < slice.GetLength(1); j++)
+                {
+                    int region = slice[i, j];
+                    if (region >= 0)
+                    {
+                        result[i + x, j + y] = regionToColor[slice[i, j]];
+                    }
+                }
+            }
+            return result;
+        }
+
         public int[,] Visual(int wHeight, int wWidth, int startX, int startY)
         {
             int[,] slice = this.Group.Slice(width, height);
@@ -162,6 +187,11 @@ namespace SZD_ZN8VJ5
             return result;
         }
 
+        public Visual GetVisual()
+        {
+            return new Visual(this);
+        }
+
         public string ToTerm(int exampleId, string type)
         {
             //object(id(0), group(1), 0, 1, 2, 3, [8, 9], id(10), id(11)).
@@ -171,6 +201,24 @@ namespace SZD_ZN8VJ5
 
             return string.Format($"object(id({objectIndex}), ex_id({exampleId}), {type}, group({Group.groupIndex}), {x}, {y}, {width}, {height}, " +
                 $"[{colors}], {noiseToIdx}, {containedByIdx}).");
+        }
+
+        public int Sum()
+        {
+            int sum = 0;
+            int[,] slice = this.Group.Slice(width, height);
+            for (int i = 0; i < slice.GetLength(0); i++)
+            {
+                for (int j = 0; j < slice.GetLength(1); j++)
+                {
+                    int region = slice[i, j];
+                    if (region >= 0)
+                    {
+                        ++sum;
+                    }
+                }
+            }
+            return sum;
         }
 
         public override bool Equals(object other)
@@ -192,7 +240,61 @@ namespace SZD_ZN8VJ5
                 Enumerable.SequenceEqual(this.regionToColor, obj.regionToColor) &&
                 this.noises.All(n => obj.noises.Contains(n)) && 
                 this.noises.Count == obj.noises.Count;
-                // do we need noiseTo?
+        }
+
+        public bool VisualEquals(object other)
+        {
+            ARCObject obj = other as ARCObject;
+            if (obj == null)
+            {
+                return false;
+            }
+            if (this == obj)
+            {
+                return true;
+            }
+            return
+                this.height == obj.height &&
+                this.width == obj.width &&
+                this.Group.AbstractEquals(obj.Group) &&
+                this.regionToColor.SequenceEqual(obj.regionToColor) &&
+                this.noises.All(n => obj.noises.Contains(n)) &&
+                this.noises.Count == obj.noises.Count;
+        }
+
+        public bool Explains(ARCObject other)
+        {
+            if (this == other)
+            {
+                return false;
+            }
+
+            int[,] thisVisual = this.FullVisual();
+            int[,] otherVisual = other.FullVisual();
+
+            for (int i = 0; i < otherVisual.GetLength(0); i++)
+            {
+                for (int j = 0; j < otherVisual.GetLength(1); j++)
+                {
+                    if (thisVisual[i, j] == otherVisual[i, j])
+                    {
+                        otherVisual[i, j] = -1;
+                    }
+                }
+            }
+
+            for (int i = 0; i < otherVisual.GetLength(0); i++)
+            {
+                for (int j = 0; j < otherVisual.GetLength(1); j++)
+                {
+                    if (otherVisual[i, j] != -1 && otherVisual[i, j] != 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         public override string ToString()

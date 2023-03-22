@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-
-namespace SZD_ZN8VJ5
+﻿
+namespace SZD_ZN8VJ5.Groups
 {
     public abstract class Group
     {
@@ -20,15 +13,15 @@ namespace SZD_ZN8VJ5
         public Group(int complexity)
         {
             this.complexity = complexity;
-            this.groupIndex = GroupCount++;
+            groupIndex = GroupCount++;
         }
 
         public abstract int[,] Slice(int width, int height);
 
         public bool AbstractEquals(Group other)
         {
-            if (this.field.GetLength(0) != other.field.GetLength(0)
-                || this.field.GetLength(1) != other.field.GetLength(1))
+            if (field.GetLength(0) != other.field.GetLength(0)
+                || field.GetLength(1) != other.field.GetLength(1))
             {
                 return false;
             }
@@ -37,7 +30,7 @@ namespace SZD_ZN8VJ5
             {
                 for (int j = 0; j < field.GetLength(1); j++)
                 {
-                    if (this.field[i, j] != other.field[i, j])
+                    if (field[i, j] != other.field[i, j])
                     {
                         return false;
                     }
@@ -48,7 +41,7 @@ namespace SZD_ZN8VJ5
 
         public override string ToString()
         {
-            return "'" + this.groupIndex;
+            return "'" + groupIndex;
         }
 
         public static int ComputeComplexity(int[,] slice)

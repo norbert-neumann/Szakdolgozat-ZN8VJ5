@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Drawing;
+using SZD_ZN8VJ5.Groups;
 
 namespace SZD_ZN8VJ5
 {
@@ -61,18 +55,26 @@ namespace SZD_ZN8VJ5
                 );
         }
 
-        private static List<ARCObject> PatchToObjects(Point topLeft, int[,] patch)
+        private static List<ARCObject> PatchToObjects(Point topLeft, int[,] patch, bool allowZero, float theta1 = 0.6f, float theta2 = 0.5f)
         {
             List<ARCObject> objects = new List<ARCObject>();
-            foreach (var G in Groups.All)
+            foreach (var G in Groups.Groups.All)
             {
-                ARCObject result = TryGroup(G, patch, 0.6f, 0.5f);
+                ARCObject result = TryGroup(G, patch, theta1, theta2);
+
                 if (result != null)
                 {
+                    
+                    if (!allowZero && result.regionToColor.Contains(0))
+                    {
+                        continue;
+                    }
+
                     result.x = topLeft.X;
                     result.y = topLeft.Y;
                     result.width = patch.GetLength(1);
                     result.height = patch.GetLength(0);
+                    result._Visual = new Visual(result);
                     objects.Add(result);
                 }
             }
@@ -99,6 +101,11 @@ namespace SZD_ZN8VJ5
                             regionToColor[pair.Key] = pair.Value;
                         }
 
+                        /*if (regionToColor.Contains(0))
+                        {
+                            continue;
+                        }*/
+
                         objects.Add(new ARCObject(
                            G,
                            topLeft.X,
@@ -108,27 +115,16 @@ namespace SZD_ZN8VJ5
                            regionToColor
                            ));
                     }
-
-                    /*int[,] cropped = Crop(patch, 0, 0, groupWidth, groupHeight);
-                    ARCObject result = TryGroup(G, cropped, 1f, 0f);
-                    if (result != null)
-                    {
-                        result.x = topLeft.X;
-                        result.y = topLeft.Y;
-                        result.width = groupWidth;
-                        result.height = groupHeight;
-                        objects.Add(result);
-                    }*/
                 }
             }
             return objects;
         }
 
-        private static List<ARCObject> ValidExistingObjects(Point topLeft, int[,] patch)
+        private static List<ARCObject> ValidExistingObjects(Point topLeft, int[,] patch, bool allowZero)
         {
             List<ARCObject> objects = new List<ARCObject>();
 
-            objects.AddRange(PatchToObjects(topLeft, patch));
+            objects.AddRange(PatchToObjects(topLeft, patch, allowZero));
             objects.AddRange(ValidPseudoObjects(topLeft, patch));
 
             return objects;
@@ -139,7 +135,8 @@ namespace SZD_ZN8VJ5
             List<ARCObject> objects = new List<ARCObject>();
 
             // Add proper groups
-            objects.AddRange(PatchToObjects(topLeft, patch));
+            objects.AddRange(PatchToObjects(topLeft, patch, isNoise));
+            bool properGroupFound = objects.Count > 0 && objects.Any(obj => !ExpHasOverlaps(patch, obj.Visual())); // set this to true only if a group has no noise?
 
             // Add reused pseudo-groups
             List<ARCObject> reused = ValidPseudoObjects(topLeft, patch);
@@ -147,7 +144,7 @@ namespace SZD_ZN8VJ5
 
             // Create synthetic full object
             ARCObject full = SynthetizeObject(topLeft, patch, isNoise);
-            if (!reused.Contains(full))
+            if (!reused.Contains(full) && !properGroupFound)
             {
                 objects.Add(full);
                 ExistingPseudoGroups.Add((PseudoGroup)full.Group);
@@ -155,20 +152,111 @@ namespace SZD_ZN8VJ5
 
             // Enumerate first uni-color continous patch
             var firstPatch = Helpers.EnumeratePatches(patch).FirstOrDefault();
-            if (firstPatch != null)
+            if (firstPatch != null && !properGroupFound)
             {
                 Point TL_internal;
-                int[,] colorPatch = Helpers.ListToField(firstPatch, patch, out TL_internal);
+                int[,] colorPatch = Helpers.ListToFieldPointsOnly(firstPatch, patch, out TL_internal);
                 TL_internal.Offset(topLeft);
-                var objs = ValidExistingObjects(TL_internal, colorPatch);
+                var objs = ValidExistingObjects(TL_internal, colorPatch, isNoise); // this return the whole obj for some reason
                 // do not synth here, search for valid proper or existing pseujdo-groups
+                if (!(objs.Count > 0 && objs.Any(obj => !ExpHasOverlaps(colorPatch, obj.Visual()))))
+                {
+                    objs.Add(SynthetizeObject(TL_internal, colorPatch, isNoise));
+                }
 
                 foreach (var obj in objs.Distinct())
                 {
                     if (objects.All(existing => !existing.Equals(obj)))
                     {
                         objects.Add(obj);
+                        if (obj.Group is PseudoGroup && !ExistingPseudoGroups.Contains(obj.Group)) //!!!
+                        {
+                            ExistingPseudoGroups.Add((PseudoGroup)obj.Group);
+                        }
                     }
+                }
+
+            }
+
+            List<ARCObject> output = new List<ARCObject>();
+            foreach (var obj in objects)
+            {
+                if (!DoubleExplain(patch, obj.Visual()))
+                {
+                    output.Add(obj);
+                }
+            }
+
+            return output;
+        }
+
+        private static List<ARCObject> CollectObjects_1(Point topLeft, int[,] patch, bool isNoise)
+        {
+            List<ARCObject> objects = new List<ARCObject>();
+
+            // Add proper groups
+            objects.AddRange(PatchToObjects(topLeft, patch, isNoise, 1f, 1f));
+            bool properGroupFound = objects.Count > 0 && objects.Any(obj => !ExpHasOverlaps(patch, obj.Visual()));
+
+            // Add reused pseudo-groups
+            List<ARCObject> reused = ValidPseudoObjects(topLeft, patch);
+            if (!properGroupFound)
+            {
+                foreach (var reusedObj in reused)
+                {
+                    if (reusedObj.Sum() == Sum(patch))
+                    {
+                        objects.Add(reusedObj);
+                    }
+                }
+            }
+
+            // Create synthetic full object
+            ARCObject full = SynthetizeObject(topLeft, patch, isNoise);
+            if (!reused.Contains(full) && !properGroupFound)
+            {
+                objects.Add(full);
+                ExistingPseudoGroups.Add((PseudoGroup)full.Group);
+            }
+
+            List<ARCObject> output = new List<ARCObject>();
+            foreach (var obj in objects)
+            {
+                if (!DoubleExplain(patch, obj.Visual()))
+                {
+                    output.Add(obj);
+                }
+            }
+
+            return output;
+        }
+
+        private static List<ARCObject> CollectObjects_2(Point topLeft, int[,] patch, bool isNoise)
+        {
+            List<ARCObject> objects = new List<ARCObject>();
+
+            // Add proper groups
+            objects.AddRange(PatchToObjects(topLeft, patch, isNoise, 0.5f, 0.5f));
+
+            // Enumerate first uni-color continous patch
+            var firstPatch = Helpers.EnumeratePatches(patch).FirstOrDefault();
+            if (firstPatch != null && objects.Count == 0)
+            {
+                Point TL_internal;
+                int[,] colorPatch = Helpers.ListToField(firstPatch, patch, out TL_internal);
+                TL_internal.Offset(topLeft);
+                objects.AddRange(PatchToObjects(TL_internal, colorPatch, isNoise));
+            }
+
+            if (objects.Count == 0)
+            {
+                List<ARCObject> reused = ValidPseudoObjects(topLeft, patch);
+                objects.AddRange(reused);
+                if (reused.Count == 0)
+                {
+                    ARCObject full = SynthetizeObject(topLeft, patch, isNoise);
+                    objects.Add(full);
+                    ExistingPseudoGroups.Add((PseudoGroup)full.Group);
                 }
             }
 
@@ -184,39 +272,165 @@ namespace SZD_ZN8VJ5
             return output;
         }
 
-        private static List<ARCObject> IDK(Point topLeft, int[,] patch)
+        public static List<ARCObject> Process_Image_1(int[][] G)
         {
-            int patchHeight = patch.GetLength(0);
-            int patchWidth = patch.GetLength(1);
             List<ARCObject> objects = new List<ARCObject>();
-            foreach (var G in ExistingPseudoGroups)
+            int[,] input = Helpers.ToMatrix(G);
+
+            foreach (var patchPoints in Helpers.EnumeratePatches(input))
             {
-                int groupHeight = G.field.GetLength(0);
-                int groupWidth = G.field.GetLength(1);
-                if (patchHeight >= groupHeight && patchWidth >= groupWidth)
+                Point TL;
+                int[,] patch = Helpers.ListToFieldPointsOnly(patchPoints, input, out TL);
+                var explanations = Process_Patch_1(TL, patch, false);
+                objects.AddRange(explanations);
+
+                foreach (var other in objects)
                 {
-                    int xEnd = patchHeight - groupHeight + 1; // possible source of error
-                    int yEnd = patchWidth - groupWidth + 1;
-
-                    for (int dx = 0; dx < xEnd; dx++)
+                    var contained = objects.Where(exp => other != exp && Helpers.ContainsWOCoexsits(other, exp)).ToList();
+                    if (contained.Count > 0)
                     {
-                        for (int dy = 0; dy < yEnd; dy++)
-                        {
-                            int[,] cropped = Crop(patch, dx, dy, groupWidth, groupHeight);
-                            ARCObject result = TryGroup(G, cropped, 1f, 0f);
-                            if (result != null)
-                            {
-                                result.x = topLeft.X + dx;
-                                result.y = topLeft.Y + dy;
-                                result.width = groupWidth;
-                                result.height = groupHeight;
-                                objects.Add(result);
-                            }
-                        }
+                        other.contains = contained;
+                        contained.ForEach(exp => exp.containedBy = other);
                     }
+                }
 
+            }
+
+
+            return objects;
+        }
+
+        private static List<ARCObject> Process_Patch_1(Point topLeft, int[,] patch, bool isNoise)
+        {
+            List<ARCObject> output = new List<ARCObject>();
+
+            foreach (ARCObject obj in CollectObjects_1(topLeft, patch, isNoise))
+            {
+                output.Add(obj);
+                // There won't be any overlapped objects
+                // No residuals either
+            }
+
+            
+            return output;
+        }
+
+        /// <summary>
+        /// Explains objects as proper groups, or as a collection of groups, else as full synthetic obj.
+        /// </summary>
+        /// <param name="G"></param>
+        /// <returns></returns>
+        public static List<ARCObject> Process_Image_2(int[][] G)
+        {
+            List<ARCObject> objects = new List<ARCObject>();
+            int[,] input = Helpers.ToMatrix(G); // interpret input as one proper group?
+            /*var test = PatchToObjects(new Point(0, 0), input, false);
+
+            if (test.Count > 0)
+            {
+                return test;
+            }*/
+
+            foreach (var patchPoints in Helpers.EnumerateMultiColorPatches(input))
+            {
+                Point TL;
+                int[,] patch = Helpers.ListToField(patchPoints, input, out TL);
+                var explanations = Process_Patch_2(TL, patch, false);
+                objects.AddRange(explanations);
+
+                foreach (var other in objects)
+                {
+                    var contained = objects.Where(exp => other != exp && Helpers.ContainsWOCoexsits(other, exp)).ToList();
+                    if (contained.Count > 0)
+                    {
+                        other.contains = contained;
+                        contained.ForEach(exp => exp.containedBy = other);
+                    }
+                }
+
+            }
+
+            List<ARCObject> result = new List<ARCObject>();
+            foreach (var obj in objects)
+            {
+                if (objects.All(x => !x.Explains(obj)))
+                {
+                    result.Add(obj);
                 }
             }
+
+            return result;
+
+
+            return objects;
+        }
+
+        private static List<ARCObject> Process_Patch_2(Point topLeft, int[,] patch, bool isNoise)
+        {
+            List<ARCObject> output = new List<ARCObject>();
+
+            foreach (ARCObject obj in CollectObjects_2(topLeft, patch, isNoise))
+            {
+                output.Add(obj);
+
+                int[,] objVisual = obj.Visual(
+                    patch.GetLength(0), patch.GetLength(1),
+                    obj.x - topLeft.X, obj.y - topLeft.Y);
+
+                int[,] overlaps = OverlappingParts2(patch, objVisual);
+                int[,] nonOverlaps = NonOverlappingParts2(patch, objVisual);
+
+                // Explain overlaps
+                foreach (List<Point> overlapPoints in Helpers.EnumeratePatchesAllowBackground(overlaps))
+                {
+                    Point overlapTL;
+                    int[,] overlapPatch = Helpers.ListToField(overlapPoints, overlaps, out overlapTL);
+                    overlapTL.Offset(topLeft);
+                    var overlapExp = Process_Patch_2(overlapTL, overlapPatch, true);
+                    overlapExp.ForEach(noise => obj.noises.Add(noise));
+                    overlapExp.ForEach(noise => noise.noiseTo = obj);
+                }
+
+                // Explain residuals
+                foreach (List<Point> residualPoints in Helpers.EnumerateMultiColorPatches(nonOverlaps))
+                {
+                    Point TL;
+                    int[,] residualPatch = Helpers.ListToField(residualPoints, nonOverlaps, out TL);
+                    TL.Offset(topLeft);
+                    var residualExp = Process_Patch_2(TL, residualPatch, false);
+                    residualExp.ForEach(residual => output.Add(residual));
+                }
+            }
+
+
+            return output;
+        }
+
+        public static List<ARCObject> Process_Image_3(int[][] G)
+        {
+            List<ARCObject> objects = new List<ARCObject>();
+            int[,] input = Helpers.ToMatrix(G);
+
+            foreach (var patchPoints in Helpers.EnumerateMultiColorPatches(input))
+            {
+                Point TL;
+                int[,] patch = Helpers.ListToFieldPointsOnly(patchPoints, input, out TL);
+                var explanations = Process_Patch_1(TL, patch, false);
+                objects.AddRange(explanations);
+
+                foreach (var other in objects)
+                {
+                    var contained = objects.Where(exp => other != exp && Helpers.ContainsWOCoexsits(other, exp)).ToList();
+                    if (contained.Count > 0)
+                    {
+                        other.contains = contained;
+                        contained.ForEach(exp => exp.containedBy = other);
+                    }
+                }
+
+            }
+
+
             return objects;
         }
 
@@ -229,13 +443,33 @@ namespace SZD_ZN8VJ5
                 int[,] patch = Helpers.ListToField(patchPoints, input, out TL);
                 var explanations = Process(TL, patch, false);
 
-                var container = objects.Where(obj => Helpers.Contains(obj, explanations.First())).LastOrDefault();
-                explanations.ForEach(exp => exp.containedBy = container);
+                //objects.AddRange(explanations.Where(exp => objects.All(obj => !Helpers.Contains(obj, exp))).ToList());
+                //var container = objects.Where(obj => Helpers.Contains(obj, explanations.First())).LastOrDefault();
+                //explanations.ForEach(exp => exp.containedBy = container);
+                // fix contains
+
+                // include Helpers.Explainings
+                foreach (var exp in explanations)
+                {
+                    var contained = explanations.Where(other => other != exp && Helpers.Contains(exp, other)).ToList();
+                    exp.contains = contained;
+                    contained.ForEach(other => other.containedBy = exp);
+                }
 
                 objects.AddRange(explanations);
+
             }
 
-            return objects;
+            // temp only
+            List<ARCObject> distinct = new List<ARCObject>();
+            foreach (var obj in objects)
+            {
+                if (!distinct.Any(other => other != obj && other.Equals(obj)))
+                {
+                    distinct.Add(obj);
+                }
+            }
+            return distinct;
         }
 
         // Standard, no edge cases
@@ -260,6 +494,7 @@ namespace SZD_ZN8VJ5
                 {
                     Point overlapTL;
                     int[,] overlapPatch = Helpers.ListToField(overlapPoints, overlaps, out overlapTL);
+                    overlapTL.Offset(topLeft);
                     var overlapExp = Process(overlapTL, overlapPatch, true);
                     overlapExp.ForEach(noise => obj.noises.Add(noise));
                     overlapExp.ForEach(noise => noise.noiseTo = obj);
@@ -270,6 +505,7 @@ namespace SZD_ZN8VJ5
                 {
                     Point TL;
                     int[,] residualPatch = Helpers.ListToField(residualPoints, nonOverlaps, out TL);
+                    TL.Offset(topLeft);
                     var residualExp = Process(TL, residualPatch, false);
                     residualExp.ForEach(residual => group.Objects.Add(residual));
                 }
@@ -291,18 +527,23 @@ namespace SZD_ZN8VJ5
 
 
             // Each group explains all others
-            foreach (var group in groups)
+            if (groups.Count > 1)
             {
-                Helpers.Explainings.Add(group.Objects, new List<ARCObject>());
-            }
-            foreach (var group in groups)
-            {
-                foreach (var other in groups)
+                foreach (var group in groups)
                 {
-                    Helpers.Explainings[group.Objects].AddRange(other.Objects);
+                    Helpers.Explainings.Add(group.Objects, new List<ARCObject>());
+                }
+                foreach (var group in groups)
+                {
+                    foreach (var other in groups)
+                    {
+                        if (group != other)
+                        {
+                            Helpers.Explainings[group.Objects].AddRange(other.Objects);
+                        }
+                    }
                 }
             }
-
             List<ARCObject> output = new List<ARCObject>();
             groups.ForEach(g => g.Objects.ForEach(obj => output.Add(obj)));
             return output;
@@ -472,6 +713,24 @@ namespace SZD_ZN8VJ5
             return result;
         }
 
+        private static bool ExpHasOverlaps(int[,] patch, int[,] exp)
+        {
+            int[,] result = new int[patch.GetLength(0), patch.GetLength(1)];
+
+            for (int i = 0; i < result.GetLength(0); i++)
+            {
+                for (int j = 0; j < result.GetLength(1); j++)
+                {
+                    if (patch[i, j] != exp[i, j] && exp[i, j] >= 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private static int[,] NonOverlappingParts(int[,] patch, int[,] exp)
         {
             int[,] result = new int[patch.GetLength(0), patch.GetLength(1)];
@@ -536,6 +795,22 @@ namespace SZD_ZN8VJ5
             return false;
         }
 
+        private static int Sum(int[,] patch)
+        {
+            int sum = 0;
+            for (int i = 0; i < patch.GetLength(0); i++)
+            {
+                for (int j = 0; j < patch.GetLength(1); j++)
+                {
+                    if (patch[i, j] > 0) // -1? 0?
+                    {
+                        ++sum;
+                    }
+                }
+            }
+            return sum;
+        }
+
         private static List<ARCObject> Simplify(List<ARCObject> A, List<ARCObject> B)
         {
             foreach (var b in B)
@@ -568,6 +843,18 @@ namespace SZD_ZN8VJ5
                 unlucyObjects.AddRange(Simplify(bottomExp, rightExp));
             }
             return unlucyObjects;
+        }
+
+        public static List<ARCObject> FullExplanation(ARCObject obj)
+        {
+            List<ARCObject> full = new List<ARCObject>();
+            full.Add(obj);
+            if (Helpers.Explainings.ContainsKey(full))
+            {
+                full = full.Union(Helpers.Explainings[full]).ToList();
+            }
+
+            return full;
         }
     }
 }

@@ -1,15 +1,74 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Drawing;
 
 namespace SZD_ZN8VJ5
 {
     public static class Helpers
     {
         public static Dictionary<List<ARCObject>, List<ARCObject>> Explainings = new Dictionary<List<ARCObject>, List<ARCObject>>();
+
+        // Shouldn't be needed after interpret processing
+        public static List<ARCObject> Minset(List<ARCObject> objects)
+        {
+            foreach (var exp in Explainings)
+            {
+                if (exp.Key.Count > exp.Value.Count && exp.Key.All(obj => objects.Where(y => y == obj).Count() > 0))
+                {
+                    exp.Key.ForEach(obj => objects.Remove(obj));
+                    objects.AddRange(exp.Value);
+                }
+            }
+
+             objects = objects.Distinct().ToList();
+
+             List<ARCObject> result = new List<ARCObject>();
+             foreach (var obj in objects)
+             {
+                 if (objects.All(x => !x.Explains(obj)))
+                 {
+                     result.Add(obj);
+                 }
+             }
+
+            return result;
+        }
+
+        public static List<ARCObject>[] SelectMinsetFromWinners(List<SIEquivalenceClass> winners)
+        {
+            return winners.Select(cl => cl.elements).ToArray();
+        }
+
+        public static bool MatchPredictions(int[][][] predictions, ARC_Task[] test)
+        {
+            /*for (int i = 0; i < test.Length; i++)
+            {
+                if (!predictions[i].SequenceEqual(test[i].output))
+                {
+                    return false;
+                }
+            }*/
+
+            for (int i = 0; i < test.Length; i++)
+            {
+                if (!(predictions[i].Length == test[i].output.Length 
+                    && predictions[i][0].Length == test[i].output[0].Length))
+                {
+                    return false;
+                }
+
+                for (int row = 0; row < test[i].output.Length; row++)
+                {
+                    for (int column = 0; column < test[i].output[row].Length; column++)
+                    {
+                        if (predictions[i][row][column] != test[i].output[row][column])
+                        {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
 
         public static bool Visit(Point p, List<Point> visitedPoints, int[][] input)
         {
@@ -56,6 +115,9 @@ namespace SZD_ZN8VJ5
                 pointsToVisit.Add(new Point(p.X + 1, p.Y - 1));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y + 1));
+
+                pointsToVisit = pointsToVisit.Distinct().ToList();
+
             }
             pointsToVisit.Remove(p);
             if (pointsToVisit.Count > 0)
@@ -79,7 +141,10 @@ namespace SZD_ZN8VJ5
                 pointsToVisit.Add(new Point(p.X + 1, p.Y - 1));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y + 1));
+
+                pointsToVisit = pointsToVisit.Distinct().ToList();
             }
+
             pointsToVisit.Remove(p);
             if (pointsToVisit.Count > 0)
             {
@@ -103,6 +168,8 @@ namespace SZD_ZN8VJ5
                 pointsToVisit.Add(new Point(p.X + 1, p.Y - 1));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y + 1));
+
+                pointsToVisit = pointsToVisit.Distinct().ToList();
             }
             pointsToVisit.Remove(p);
             if (pointsToVisit.Count > 0)
@@ -127,6 +194,8 @@ namespace SZD_ZN8VJ5
                 pointsToVisit.Add(new Point(p.X + 1, p.Y - 1));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y));
                 pointsToVisit.Add(new Point(p.X + 1, p.Y + 1));
+
+                pointsToVisit = pointsToVisit.Distinct().ToList();
             }
             pointsToVisit.Remove(p);
             if (pointsToVisit.Count > 0)
@@ -237,14 +306,46 @@ namespace SZD_ZN8VJ5
             return -1;
         }
 
+        // X contains Y
+        public static bool Coexists(ARCObject X, ARCObject Y)
+        {
+            foreach (var item in Helpers.Explainings)
+            {
+                if (item.Key.Contains(Y) && item.Value.Contains(X))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public static bool Contains(ARCObject obj1, ARCObject obj2)
         {
-            return obj1.x <= obj2.x && obj1.y <= obj2.y &&
+            return Coexists(obj1, obj2) && 
+                   !PerfectOverlap(obj1, obj2) &&
+                   obj1.x <= obj2.x && obj1.y <= obj2.y &&
                    obj1.width >= obj2.width && obj1.height >= obj2.height &&
                    obj2.x <= obj1.x + obj1.width &&
                    obj2.x + obj2.width <= obj1.x + obj1.width &&
                    obj2.y <= obj1.y + obj1.height &&
                    obj2.y + obj2.height <= obj1.y + obj1.height;
+        }
+
+        public static bool ContainsWOCoexsits(ARCObject obj1, ARCObject obj2)
+        {
+            return !PerfectOverlap(obj1, obj2) &&
+                   obj1.x <= obj2.x && obj1.y <= obj2.y &&
+                   obj1.width >= obj2.width && obj1.height >= obj2.height &&
+                   obj2.x <= obj1.x + obj1.width &&
+                   obj2.x + obj2.width <= obj1.x + obj1.width &&
+                   obj2.y <= obj1.y + obj1.height &&
+                   obj2.y + obj2.height <= obj1.y + obj1.height;
+        }
+
+        private static bool PerfectOverlap(ARCObject obj1, ARCObject obj2)
+        {
+            return obj1.x == obj2.x && obj1.y == obj2.y &&
+                   obj1.width == obj2.width && obj1.height == obj2.height;
         }
 
         public static int[][] CopyArray(int[][] G)
@@ -339,6 +440,33 @@ namespace SZD_ZN8VJ5
             return field;
         }
 
+        public static int[,] ListToFieldPointsOnly(List<Point> points, int[,] G, out Point topLeft)
+        {
+            int minX = points.Min(p => p.X);
+            int maxX = points.Max(p => p.X);
+            int minY = points.Min(p => p.Y);
+            int maxY = points.Max(p => p.Y);
+
+            List<Point> minXs = points.Where(p => p.X == minX).ToList();
+            List<Point> maxXs = points.Where(p => p.X == maxX).ToList();
+
+            topLeft = new Point(minX, minY);
+            Point topRight = new Point(minX, maxY);
+            Point bottomLeft = new Point(maxX, minY);
+            Point bottomRight = new Point(maxX, maxY);
+            int width = topRight.Y - topLeft.Y;
+            int height = bottomLeft.X - topLeft.X;
+
+            int[,] field = new int[height + 1, width + 1];
+
+            foreach (var point in points)
+            {
+                field[point.X - topLeft.X, point.Y - topLeft.Y] = G[point.X, point.Y];
+            }
+
+            return field;
+        }
+
         public static List<List<Point>> EnumeratePatches(int[,] patch)
         {
             List<List<Point>> patches = new List<List<Point>>();
@@ -390,6 +518,113 @@ namespace SZD_ZN8VJ5
             }
 
             return patches;
+        }
+
+        public static Dictionary<int, List<int>> ConvertToDict(bool[,] M)
+        {
+            Dictionary<int, List<int>> renaming = new Dictionary<int, List<int>>();
+
+            for (int i = 0; i < M.GetLength(0); i++)
+            {
+                renaming.Add(i, new List<int>());
+                for (int j = 0; j < M.GetLength(1); j++)
+                {
+                    if (M[i, j])
+                    {
+                        renaming[i].Add(j);
+                    }
+                }
+                if (renaming[i].Count == 0)
+                {
+                    renaming.Remove(i);
+                }
+            }
+
+            return renaming;
+        }
+
+        public static int[][] Render(List<ARCObject> objects)
+        {
+            int[][] canvas = new int[30][];
+            for (int i = 0; i < 30; i++)
+            {
+                canvas[i] = new int[30];
+            }
+
+            foreach (var obj in objects)
+            {
+                int[,] visual = obj.FullVisual();
+                for (int i = 0; i < 30; i++)
+                {
+                    for (int j = 0; j < 30; j++)
+                    {
+                        if (visual[i, j] != -1)
+                        {
+                            canvas[i][j] = visual[i, j];
+                        }
+                    }
+                }
+
+                foreach (var noise in obj.noises)
+                {
+                    int[,] noiseVisual = noise.FullVisual();
+                    for (int i = 0; i < 30; i++)
+                    {
+                        for (int j = 0; j < 30; j++)
+                        {
+                            if (noiseVisual[i, j] != -1)
+                            {
+                                canvas[i][j] = noiseVisual[i, j];
+                            }
+                        }
+                    }
+                }
+            }
+
+            return canvas;
+        }
+
+        public static void Display(int[][] arr)
+        {
+            for (int i = 0; i < arr.Length; i++)
+            {
+                for (int j = 0; j < arr[0].Length; j++)
+                {
+                    Console.BackgroundColor = GetConsoleColor(arr[i][j]);
+                    Console.Write("  ");
+                }
+                Console.ResetColor();
+                Console.WriteLine();
+            }
+        }
+
+        private static ConsoleColor GetConsoleColor(int color)
+        {
+            switch (color)
+            {
+                case 0:
+                    return ConsoleColor.Black;
+                case 1:
+                    return ConsoleColor.DarkBlue;
+                case 2:
+                    return ConsoleColor.Red;
+                case 3:
+                    return ConsoleColor.Green;
+                case 4:
+                    return ConsoleColor.Yellow;
+                case 5:
+                    return ConsoleColor.Gray;
+                case 6:
+                    return ConsoleColor.Magenta;
+                case 7:
+                    return ConsoleColor.DarkYellow;
+                case 8:
+                    return ConsoleColor.Blue;
+                case 9:
+                    return ConsoleColor.DarkRed;
+                default:
+                    return ConsoleColor.White;
+            }
         }
     }
 }
