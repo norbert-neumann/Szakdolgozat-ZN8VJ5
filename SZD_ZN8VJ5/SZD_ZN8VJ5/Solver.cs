@@ -1,16 +1,18 @@
 ﻿
+using System.Diagnostics;
+
 namespace SZD_ZN8VJ5
 {
     public class Solver
     {
-        private static List<Func<int[][], List<ARCObject>>> interpreters;
+        public static List<Func<int[][], List<ARCObject>>> interpreters;
 
         static Solver()
         {
             interpreters = new List<Func<int[][], List<ARCObject>>>();
-            interpreters.Add(Preprocessing.Process_Image_1);
-            interpreters.Add(Preprocessing.Process_Image_2);
-            interpreters.Add(Preprocessing.Process_Image_3);
+            interpreters.Add(Preprocessing.Process_Image_Unicolor);
+            interpreters.Add(Preprocessing.Process_Image_UniformPattern);
+            interpreters.Add(Preprocessing.Process_Image_Multicolor);
         }
 
         public static void Solve(List<ARC_File> files)
@@ -37,6 +39,11 @@ namespace SZD_ZN8VJ5
         public static void Solve(List<ARC_File> files, List<string> fileNames)
         {
             int solved = 0;
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
+            List<ARC_File> copiedFiles = new List<ARC_File>(files);
+
             foreach (var (file, fileName) in files.Zip(fileNames))
             {
                 Console.Write("Solving " + fileName + "...");
@@ -45,6 +52,7 @@ namespace SZD_ZN8VJ5
                 if (success)
                 {
                     ++solved;
+                    copiedFiles.Remove(file);
                     Console.WriteLine(" -> Solved");
                 }
                 else
@@ -53,8 +61,12 @@ namespace SZD_ZN8VJ5
                 }
             }
 
-            Console.WriteLine($"Results: solved: {solved}, unsolved: {files.Count - solved}, " +
-                $"accuracy: {solved / (float)files.Count}");
+            sw.Stop();
+
+            Console.WriteLine($"\nResults:\n\tsolved: {solved},\n\tunsolved: {files.Count - solved},\n\t" +
+                $"accuracy: {solved / (float)files.Count},\n\ttotal runtime (seconds): {sw.Elapsed.TotalSeconds},\n\t" +
+                $"average task time (seconds): {sw.Elapsed.TotalSeconds / (float)files.Count}");
+
         }
 
         public static bool Solve(ARC_File file)
@@ -63,28 +75,30 @@ namespace SZD_ZN8VJ5
             {
                 try
                 {
-                    ProgramInduction.objToAnchor.Clear();
-                    PredicateEngine.visuals.Clear();
-                    PredicateEngine.objToPredicates.Clear();
-                    PredicateEngine.objToUniquePredicates.Clear();
+                    Classifier.ObjectToAnchor.Clear();
+                    PredicateEngine.Visuals.Clear();
+                    PredicateEngine.ObjectToPredicates.Clear();
+                    PredicateEngine.ObjectToUniquePredicates.Clear();
                     Preprocessing.ExistingPseudoGroups.Clear();
 
                     var predictions = TrySolve(file, interpreter);
-                    if (Helpers.MatchPredictions(predictions, file.test))
+                    if (ImageProcessing.MatchPredictions(predictions, file.test))
                     {
                         return true;
                     }
                 }
                 catch (Exception)
                 {
+
                 }
             }
+
             return false;
         }
 
         public static int[][][] TrySolve(ARC_File file, Func<int[][], List<ARCObject>> interpreter)
         {
-            Clipper.Instantiate(file);
+            Postprocessing.SetClipMode(file);
             List<ARCObject> inputs = new List<ARCObject>();
             List<ARCObject> objects = new List<ARCObject>();
             List<SuperimposedARCPRogram> programs = new List<SuperimposedARCPRogram>();
@@ -96,25 +110,25 @@ namespace SZD_ZN8VJ5
 
                 List<ARCObject> flattenedX = new List<ARCObject>();
                 flattenedX.AddRange(X);
-                X.ForEach(x => flattenedX.AddRange(x.noises));
+                X.ForEach(x => flattenedX.AddRange(x.Noises));
 
                 List<ARCObject> flattenedY = new List<ARCObject>();
                 flattenedY.AddRange(Y);
-                Y.ForEach(y => flattenedY.AddRange(y.noises));
+                Y.ForEach(y => flattenedY.AddRange(y.Noises));
 
                 EquivalenceSaturation.Update(flattenedX);
-                ProgramInduction.SetAnhors(flattenedX, flattenedY);
+                Classifier.SetAnchors(flattenedX, flattenedY);
                 PredicateEngine.AddScene(flattenedX);
 
                 inputs.AddRange(X);
                 objects.AddRange(Y);
-                programs.AddRange(Y.Select(y => EquivalenceSaturation.Saturate(y, flattenedX)));
+                programs.AddRange(Y.Select(y => EquivalenceSaturation.Saturate(y)));
             }
 
 
-            var winners = ProgramInduction.TestOuter(programs.ToList(), objects.ToList());
-            var roles = Helpers.SelectMinsetFromWinners(winners);
-            var anchorPredicates = ProgramInduction.FindRolePredicates(inputs, roles);
+            var winners = ProgramInduction.Induce(programs.ToList(), objects.ToList());
+            var roles = winners.Select(cl => cl.Elements).ToArray();
+            var anchorPredicates = Classifier.FindRolePredicates(inputs, roles);
             int[][][] predictions = new int[file.test.Length][][];
 
             for (int i = 0; i < file.test.Length; i++)
@@ -125,10 +139,10 @@ namespace SZD_ZN8VJ5
 
                 for (int j = 0; j < roles.Length; j++)
                 {
-                    var currProgram = winners[j].program.CollapseFirst();
+                    var currProgram = winners[j].Program.CollapseBestFit();
                     var currAnchorPredicates = anchorPredicates[j];
 
-                    var anchors = PredicateEngine.AnchorsForGivenRole(currAnchorPredicates);
+                    var anchors = PredicateEngine.FilterByPredicates(currAnchorPredicates);
                     foreach (var anchor in anchors)
                     {
                         PredicateEngine.CurrentAnchor = anchor;
@@ -138,7 +152,7 @@ namespace SZD_ZN8VJ5
 
                 }
 
-                predictions[i] = Clipper.Clip(Helpers.Render(Y), file.test[i].input);
+                predictions[i] = Postprocessing.Clip(Postprocessing.Render(Y), file.test[i].input);
             }
 
             return predictions;

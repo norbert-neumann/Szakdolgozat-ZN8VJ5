@@ -26,10 +26,40 @@ namespace SZD_ZN8VJ5.Groups
                 return false;
             }
 
+            Dictionary<int, int> map = new Dictionary<int, int>();
+
             for (int i = 0; i < field.GetLength(0); i++)
             {
                 for (int j = 0; j < field.GetLength(1); j++)
                 {
+                    /*if (field[i, j] >= 0 && other.field[i, j] == -1)
+                    {
+                        return false;
+                    }
+                    else if (other.field[i, j] >= 0 && field[i, j] == -1)
+                    {
+                        return false;
+                    }
+
+                    if (!map.ContainsKey(field[i, j]))
+                    {
+                        if (!map.ContainsValue(other.field[i, j]))
+                        {
+                            map.Add(field[i, j], other.field[i, j]);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        if (map[field[i, j]] != other.field[i, j])
+                        {
+                            return false;
+                        }
+                    }*/
+
                     if (field[i, j] != other.field[i, j])
                     {
                         return false;
@@ -42,6 +72,24 @@ namespace SZD_ZN8VJ5.Groups
         public override string ToString()
         {
             return "'" + groupIndex;
+        }
+
+        public int RegionCount(int region)
+        {
+            int count = 0;
+
+            for (int i = 0; i < field.GetLength(0); i++)
+            {
+                for (int j = 0; j < field.GetLength(1); j++)
+                {
+                    if (field[i, j] == region)
+                    {
+                        ++count;
+                    }
+                }
+            }
+
+            return count;
         }
 
         public static int ComputeComplexity(int[,] slice)

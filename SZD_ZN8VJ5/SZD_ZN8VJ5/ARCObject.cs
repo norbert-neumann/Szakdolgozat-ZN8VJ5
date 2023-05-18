@@ -4,78 +4,23 @@ namespace SZD_ZN8VJ5
 {
     public class ARCObject
     {
-        public Group Group { get; set; }
-        public int x;
-        public int y;
-        public int width;
-        public int height;
+        public Group Group;
+        public int X;
+        public int Y;
+        public int Width;
+        public int Height;
 
-        public int[] regionToTile;
-        public int[] regionToColor;
+        public int[] RegionToColor;
 
-        public List<ARCObject> noises = new List<ARCObject>();
-        public List<ARCObject> contains = new List<ARCObject>();
-        public ARCObject noiseTo;
-        public ARCObject containedBy;
+        public List<ARCObject> Noises = new List<ARCObject>();
+        public List<ARCObject> ContainedObjects = new List<ARCObject>();
+        public ARCObject Parent;
+        public ARCObject ContainedBy;
 
         public Visual _Visual;
 
         public static int ObjectCount = 0;
         public int objectIndex;
-
-        public static List<Func<ARCObject, object>> Properties = new List<Func<ARCObject, object>>();
-        public static List<string> PropertyNames = new List<string>();
-
-        public static List<Func<ARCObject, ARCObject>> Parents = new List<Func<ARCObject, ARCObject>>();
-        public static List<string> ParentNames = new List<string>();
-
-        public ARCObject(Group group, int[] tileToColor, bool dummy)
-        {
-            this.Group = group;
-            this.objectIndex = ObjectCount++;
-
-            /*this.regionTocolor = tileToColor;
-            List<int>[] colors = new List<int>[10];
-            for (int i = 0; i < 10; i++)
-            {
-                colors[i] = new List<int>();
-            }
-
-            int regionCount = 0;
-            for (int tileIdx = 0; tileIdx < tileToColor.Length; tileIdx++)
-            {
-                if (tileToColor[tileIdx] >= 0)
-                {
-                    if (colors[tileToColor[tileIdx]].Count() == 0)
-                    {
-                        ++regionCount;
-                    }
-                    colors[tileToColor[tileIdx]].Add(tileIdx);
-                }
-            }
-
-            this.regionToTile = new int[tileToColor.Length];
-            for (int i = 0; i < regionToTile.Length; i++)
-            {
-                this.regionToTile[i] = -1;
-            }
-
-            this.regionToColor = new int[regionCount];
-
-            int regionIndex = 0;
-            for (int i = 0; i < colors.Length; i++)
-            {
-                if (colors[i].Count() > 0)
-                {
-                    foreach (int tileIdx in colors[i])
-                    {
-                        this.regionToTile[tileIdx] = regionIndex;
-                    }
-                    this.regionToColor[regionIndex] = i;
-                    ++regionIndex;
-                }
-            }*/
-        }
 
         public ARCObject()
         {
@@ -86,41 +31,80 @@ namespace SZD_ZN8VJ5
         {
             this.objectIndex = ObjectCount++;
             this.Group = group;
-            this.regionToColor = regionToColor;
+            this.RegionToColor = regionToColor;
         }
 
         public ARCObject(Group group, int x, int y, int width, int height, int[] regionToColor)
         {
             this.objectIndex = ObjectCount++;
             this.Group = group;
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-            this.regionToColor = regionToColor;
+            this.X = x;
+            this.Y = y;
+            this.Width = width;
+            this.Height = height;
+            this.RegionToColor = regionToColor;
 
             this._Visual = new Visual(this);
         }
 
-        public bool LooksLike(ARCObject other)
+        public int[,] Appearance(bool isNoise)
         {
-            if (other == null)
+            int[,] visual = this.Visual();
+
+            if (!isNoise)
             {
-                return false;
-            }
-            foreach (var selector in Properties)
-            {
-                if (!selector.Invoke(this).Equals(selector.Invoke(other)))
+                for (int i = 0; i < visual.GetLength(0); i++)
                 {
-                    return false;
+                    for (int j = 0; j < visual.GetLength(1); j++)
+                    {
+                        if (visual[i, j] == -1)
+                        {
+                            visual[i, j] = 0;
+                        }
+                    }
                 }
             }
-            return Array.Equals(this.regionToColor, other.regionToColor); // TODO: this might not be the right comparison
+
+            foreach (var noise in this.Noises)
+            {
+                int[,] noiseVisual = noise.Appearance(true);
+                for (int i = 0; i < noiseVisual.GetLength(0); i++)
+                {
+                    for (int j = 0; j < noiseVisual.GetLength(1); j++)
+                    {
+                        if (noiseVisual[i, j] != -1)
+                        {
+                            visual[i + noise.X, j + noise.Y] = noiseVisual[i, j];
+                        }
+                    }
+                }
+            }
+
+            return visual;
         }
 
         public int[,] Visual()
         {
-            int[,] slice = this.Group.Slice(width, height);
+            int[,] slice = this.Group.Slice(Width, Height);
+
+            int regionCount = 0;
+            Dictionary<int, int> globalToLocal = new Dictionary<int, int>();
+
+            for (int i = 0; i < slice.GetLength(0); i++)
+            {
+                for (int j = 0; j < slice.GetLength(1); j++)
+                {
+                    if (slice[i, j] >= 0)
+                    {
+                        if (!globalToLocal.ContainsKey(slice[i, j]))
+                        {
+                            globalToLocal.Add(slice[i, j], regionCount++);
+                        }
+                        slice[i, j] = globalToLocal[slice[i, j]];
+                    }
+                }
+            }
+
             for (int i = 0; i < slice.GetLength(0); i++)
             {
                 for (int j = 0; j < slice.GetLength(1); j++)
@@ -128,7 +112,7 @@ namespace SZD_ZN8VJ5
                     int region = slice[i, j];
                     if (region >= 0)
                     {
-                        slice[i, j] = regionToColor[slice[i, j]];
+                        slice[i, j] = RegionToColor[slice[i, j]];
                     }
                 }
             }
@@ -146,7 +130,7 @@ namespace SZD_ZN8VJ5
                 }
             }
 
-            int[,] slice = this.Group.Slice(width, height);
+            int[,] slice = this.Group.Slice(Width, Height);
             for (int i = 0; i < slice.GetLength(0); i++)
             {
                 for (int j = 0; j < slice.GetLength(1); j++)
@@ -154,7 +138,7 @@ namespace SZD_ZN8VJ5
                     int region = slice[i, j];
                     if (region >= 0)
                     {
-                        result[i + x, j + y] = regionToColor[slice[i, j]];
+                        result[i + X, j + Y] = RegionToColor[slice[i, j]];
                     }
                 }
             }
@@ -163,7 +147,26 @@ namespace SZD_ZN8VJ5
 
         public int[,] Visual(int wHeight, int wWidth, int startX, int startY)
         {
-            int[,] slice = this.Group.Slice(width, height);
+            int[,] slice = this.Group.Slice(Width, Height);
+
+            int regionCount = 0;
+            Dictionary<int, int> globalToLocal = new Dictionary<int, int>();
+
+            for (int i = 0; i < slice.GetLength(0); i++)
+            {
+                for (int j = 0; j < slice.GetLength(1); j++)
+                {
+                    if (slice[i, j] >= 0)
+                    {
+                        if (!globalToLocal.ContainsKey(slice[i, j]))
+                        {
+                            globalToLocal.Add(slice[i, j], regionCount++);
+                        }
+                        slice[i, j] = globalToLocal[slice[i, j]];
+                    }
+                }
+            }
+
             int[,] result = new int[wHeight, wWidth];
             for (int i = 0; i < wHeight; i++)
             {
@@ -180,7 +183,7 @@ namespace SZD_ZN8VJ5
                     int region = slice[i, j];
                     if (region >= 0)
                     {
-                        result[startX + i, startY + j] = regionToColor[slice[i, j]];
+                        result[startX + i, startY + j] = RegionToColor[slice[i, j]];
                     }
                 }
             }
@@ -192,21 +195,10 @@ namespace SZD_ZN8VJ5
             return new Visual(this);
         }
 
-        public string ToTerm(int exampleId, string type)
-        {
-            //object(id(0), group(1), 0, 1, 2, 3, [8, 9], id(10), id(11)).
-            string noiseToIdx = this.noiseTo == null ? "null": string.Format("id({0})", this.noiseTo.objectIndex);
-            string containedByIdx = this.containedBy == null ? "null" : string.Format("id({0})", this.containedBy.objectIndex);
-            string colors = string.Join(", ", regionToColor);
-
-            return string.Format($"object(id({objectIndex}), ex_id({exampleId}), {type}, group({Group.groupIndex}), {x}, {y}, {width}, {height}, " +
-                $"[{colors}], {noiseToIdx}, {containedByIdx}).");
-        }
-
         public int Sum()
         {
             int sum = 0;
-            int[,] slice = this.Group.Slice(width, height);
+            int[,] slice = this.Group.Slice(Width, Height);
             for (int i = 0; i < slice.GetLength(0); i++)
             {
                 for (int j = 0; j < slice.GetLength(1); j++)
@@ -232,14 +224,14 @@ namespace SZD_ZN8VJ5
             {
                 return true;
             }
-            return this.x == obj.x &&
-                this.y == obj.y &&
-                this.height == obj.height &&
-                this.width == obj.width &&
+            return this.X == obj.X &&
+                this.Y == obj.Y &&
+                this.Height == obj.Height &&
+                this.Width == obj.Width &&
                 this.Group.AbstractEquals(obj.Group) &&
-                Enumerable.SequenceEqual(this.regionToColor, obj.regionToColor) &&
-                this.noises.All(n => obj.noises.Contains(n)) && 
-                this.noises.Count == obj.noises.Count;
+                Enumerable.SequenceEqual(this.RegionToColor, obj.RegionToColor) &&
+                this.Noises.All(n => obj.Noises.Contains(n)) && 
+                this.Noises.Count == obj.Noises.Count;
         }
 
         public bool VisualEquals(object other)
@@ -254,12 +246,35 @@ namespace SZD_ZN8VJ5
                 return true;
             }
             return
-                this.height == obj.height &&
-                this.width == obj.width &&
+                this.Height == obj.Height &&
+                this.Width == obj.Width &&
                 this.Group.AbstractEquals(obj.Group) &&
-                this.regionToColor.SequenceEqual(obj.regionToColor) &&
-                this.noises.All(n => obj.noises.Contains(n)) &&
-                this.noises.Count == obj.noises.Count;
+                this.RegionToColor.SequenceEqual(obj.RegionToColor) &&
+                this.Noises.All(n => obj.Noises.Contains(n)) &&
+                this.Noises.Count == obj.Noises.Count;
+        }
+
+        public bool VisualEquals2(ARCObject other)
+        {
+            int[,] v1 = this.Appearance(false);
+            int[,] v2 = other.Appearance(false);
+
+            if (v1.GetLength(0) == v2.GetLength(0) && v1.GetLength(1) == v2.GetLength(1))
+            {
+                for (int i = 0; i < v1.GetLength(0); i++)
+                {
+                    for (int j = 0; j < v1.GetLength(1); j++)
+                    {
+                        if (v1[i, j] != v2[i, j])
+                        {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            return false;
         }
 
         public bool Explains(ARCObject other)

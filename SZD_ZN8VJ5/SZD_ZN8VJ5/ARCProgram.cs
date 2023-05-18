@@ -14,6 +14,8 @@ namespace SZD_ZN8VJ5
         public Expression NoiseExpr;
         public Expression ColorExpr;
 
+        private int State;
+
         public static ARCProgram Build(Expression Group, Expression X, Expression Y, Expression Width, Expression Height,
             Expression[] Color, Expression ColorExpr, List<ARCProgram> Noise, Expression NoiseExpr)
         {
@@ -120,7 +122,55 @@ namespace SZD_ZN8VJ5
             Height = height;
             Color = color;
         }
+    
+            
+        public string ToFileString(string prefix="")
+        {
+            return String.Format($"{prefix}shape: \t{Group}\n{prefix}x: \t{X}\n{prefix}y: " +
+                $"\t{Y}\n{prefix}width: \t{Width}\n{prefix}height: {Height}\n" +
+                $"{prefix}color: {GetColorString(prefix)}\n{prefix}noise: {GetNoiseString()}");
+        }
 
+        public string GetColorString(string prefix)
+        {
+            string result = String.Empty;
 
+            if (Color != null)
+            {
+                for (int i = 0; i < Color.Length; i++)
+                {
+                    result += String.Format($"\n\t{prefix}region {i}: {Color[i]}");
+                }
+            }
+            else
+            {
+                result += "\t" + prefix + ColorExpr;
+            }
+
+            return result;
+        }
+
+        public string GetNoiseString()
+        {
+            string result = String.Empty;
+
+            if (Noise != null)
+            {
+                for (int i = 0; i < Noise.Count; i++)
+                {
+                    result += String.Format($"\n\tnoise {i}: \n{Noise[i].ToFileString(prefix:"\t\t")}");
+                }
+            }
+            else if (NoiseExpr != null)
+            {
+                result += "\t" + NoiseExpr;
+            }
+            else
+            {
+                result += "\t-";
+            }
+
+            return result;
+        }
     }
 }

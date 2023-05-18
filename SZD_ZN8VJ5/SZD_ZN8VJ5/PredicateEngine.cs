@@ -1,12 +1,13 @@
-﻿
+﻿using System.Diagnostics.Contracts;
+using System.Linq;
+using System.Runtime.CompilerServices;
+
 namespace SZD_ZN8VJ5
 {
     public enum PredicateType
     {
         Object,
         ObjectInt,
-        ObjectContext,
-        ObjectContextInt,
         Anchor
     }
 
@@ -40,14 +41,57 @@ namespace SZD_ZN8VJ5
 
         public override string ToString()
         {
-            if (Argument >= 0)
+            switch (Type)
             {
-                return string.Format("{0}[{1} {2} {3}]", Inverse ? "!" : "", (int)Type, PredicateIndex, Argument);
+                case PredicateType.Object: return ObjectPredicateToString();
+                case PredicateType.ObjectInt: return ObjectIntPredicateToString();
+                case PredicateType.Anchor: return "ANCHOR";
             }
-            else
+
+            return string.Empty;
+        }
+
+        private string ObjectPredicateToString()
+        {
+            string prefix = Inverse ? "!" : "";
+
+            switch (PredicateIndex)
             {
-                return string.Format("{0}[{1} {2}]", Inverse ? "!" : "", (int)Type, PredicateIndex);
+                case 0: return prefix + "contained";
+                case 1: return prefix + "container";
+                case 2: return prefix + "child";
+                case 3: return prefix + "parent";
+                case 4: return prefix + "unicolor";
+                case 5: return prefix + "multicolor";
+
+                case 6: return prefix + "belongs_to_color_group";
+                case 7: return prefix + "belongs_to_visual_group";
+                case 8: return prefix + "unqiue_color";
+                case 9: return prefix + "unqiue_visual";
+                case 10: return prefix + "is_max";
+                case 11: return prefix + "is_min";
             }
+
+            return string.Empty;
+        }
+
+        private string ObjectIntPredicateToString()
+        {
+            string prefix = Inverse ? "!" : "";
+
+            switch (PredicateIndex)
+            {
+                case 0: return prefix + string.Format("has_color ({0})", Argument);
+                case 1: return prefix + string.Format("const_visual ({0})", Argument);
+                case 2: return prefix + string.Format("contained_by_const_visual ({0})", Argument);
+
+                case 3: return prefix + string.Format("belongs_to_specific_color_group ({0})", Argument);
+                case 4: return prefix + string.Format("belongs_to_specific_visual_group ({0})", Argument);
+                case 5: return prefix + string.Format("belongs_to_visual_group_contained_by_const_visual ({0})", Argument);
+                case 6: return prefix + string.Format("is_max_color ({0})", Argument);
+            }
+
+            return string.Empty;
         }
 
         public override bool Equals(object? obj)
@@ -71,8 +115,8 @@ namespace SZD_ZN8VJ5
         public static List<Predicate> CurrentAnchorPredicates = null;
         public static ARCObject CurrentAnchor = null;
 
-        public static List<Visual> visuals;
-        public static List<ARCObject> Environment;
+        public static List<Visual> Visuals; // set this to private
+        public static List<ARCObject> Environment; // move this to Solver
 
         private static List<Func<ARCObject, bool>> objectPredicates;
         private static List<Func<ARCObject, int, bool>> objectIntPredicates;
@@ -80,14 +124,14 @@ namespace SZD_ZN8VJ5
         private static List<Func<ARCObject, List<ARCObject>, int, bool>> objectContextIntPredicates;
 
 
-        public static Dictionary<ARCObject, List<Predicate>> objToPredicates;
-        public static Dictionary<ARCObject, List<Predicate>> objToUniquePredicates;
+        public static Dictionary<ARCObject, List<Predicate>> ObjectToPredicates;
+        public static Dictionary<ARCObject, List<Predicate>> ObjectToUniquePredicates;
 
         static PredicateEngine()
         {
-            visuals = new List<Visual>();
-            objToPredicates = new Dictionary<ARCObject, List<Predicate>>();
-            objToUniquePredicates = new Dictionary<ARCObject, List<Predicate>>();
+            Visuals = new List<Visual>();
+            ObjectToPredicates = new Dictionary<ARCObject, List<Predicate>>();
+            ObjectToUniquePredicates = new Dictionary<ARCObject, List<Predicate>>();
 
             objectPredicates = new List<Func<ARCObject, bool>>();
             objectIntPredicates = new List<Func<ARCObject, int, bool>>();
@@ -102,64 +146,61 @@ namespace SZD_ZN8VJ5
             objectPredicates.Add(UniColor);
             objectPredicates.Add(MultiColor);
 
+            objectPredicates.Add(ObjectBelongsToColorGroup);
+            objectPredicates.Add(ObjectBelongsToVisualGroup);
+            objectPredicates.Add(UniqueColor);
+            objectPredicates.Add(UniqueVisual);
+            objectPredicates.Add(IsMax);
+            objectPredicates.Add(IsMin);
+
             // Color predicates: Has-Color, ConstVisual
             objectIntPredicates.Add(HasColor);
             objectIntPredicates.Add(ConstVisual);
             objectIntPredicates.Add(ContainedByConstantVisual);
 
-            // Context predicates: Group predicates, Unique predicates
-            objectContextPredicates.Add(ObjectBelongsToColorGroup);
-            objectContextPredicates.Add(ObjectBelongsToVisualGroup);
-            objectContextPredicates.Add(UniqueColor);
-            objectContextPredicates.Add(UniqueVisual);
-
-            // Arged context predicates: Arged group predicates
-            objectContextIntPredicates.Add(ObjectBelongsToSpecificColorGroup);
-            objectContextIntPredicates.Add(ObjectBelongsToSpecificVisualGroup);
-            objectContextIntPredicates.Add(BelongsToShapeGroup_ContainedByConstantVisual);
+            objectIntPredicates.Add(ObjectBelongsToSpecificColorGroup);
+            objectIntPredicates.Add(ObjectBelongsToSpecificVisualGroup);
+            objectIntPredicates.Add(BelongsToShapeGroup_ContainedByConstantVisual);
+            objectIntPredicates.Add(IsMaxColor);
         }
 
         public static void AddScene(List<ARCObject> objects)
         {
+            Environment = objects;
+
             // Add new unique visuals
-            visuals = visuals.Union(objects.Select(obj => obj._Visual)).Distinct().ToList(); // null here?
+            Visuals = Visuals.Union(objects.Select(obj => obj._Visual)).Distinct().ToList(); // null here?
 
             foreach (var obj in objects)
             {
-                objToPredicates.Add(obj, AddTruePredicates(obj, objects));
+                ObjectToPredicates.Add(obj, AddTruePredicates(obj, objects));
             }
 
             foreach (var obj in objects)
             {
-                objToUniquePredicates.Add(obj, GetUniquePredicates(obj, objects));
+                ObjectToUniquePredicates.Add(obj, GetUniquePredicates(obj, objects));
             }
         }
 
-        public static void ReloadReducesScene(List<ARCObject> objects)
+        public static ARCObject Execute(Predicate predicate)
         {
-            objToPredicates.Clear();
-            objToUniquePredicates.Clear();
+            return Execute(new List<Predicate>() { predicate });
+        }
 
-            foreach (var obj in objects)
-            {
-                objToPredicates.Add(obj, AddTruePredicates(obj, objects));
-            }
-
-            foreach (var obj in objects)
-            {
-                objToUniquePredicates.Add(obj, GetUniquePredicates(obj, objects));
-            }
+        public static List<ARCObject> FilterByPredicates(List<Predicate> rolePredicates)
+        {
+            return Environment.Where(obj => rolePredicates.All(pred => PredicateEngine.ExecuteOnObject(obj, pred))).ToList();
         }
 
         private static List<Predicate> GetUniquePredicates(ARCObject obj, List<ARCObject> context)
         {
             List<Predicate> uniquePredicates = new List<Predicate>();
-            List<ARCObject> negatives = context.Where(x => Helpers.Coexists(obj, x)).ToList();
+            List<ARCObject> negatives = context.ToList();
             negatives.Remove(obj);
 
-            foreach (var predicate in objToPredicates[obj])
+            foreach (var predicate in ObjectToPredicates[obj])
             {
-                bool isUnique = negatives.All(negative => !objToPredicates[negative].Contains(predicate));
+                bool isUnique = negatives.All(negative => !ObjectToPredicates[negative].Contains(predicate));
                 if (isUnique)
                 {
                     uniquePredicates.Add(predicate);
@@ -185,19 +226,24 @@ namespace SZD_ZN8VJ5
             }
 
             // Has-color
-            foreach (var color in obj.regionToColor)
+            foreach (var color in obj.RegionToColor)
             {
                 truePredicates.Add(new Predicate(PredicateType.ObjectInt, objectIntPredicates.IndexOf(HasColor), color));
+
+                if (IsMaxColor(obj, color))
+                {
+                    truePredicates.Add(new Predicate(PredicateType.ObjectInt, objectIntPredicates.IndexOf(IsMaxColor), color));
+                }
             }
 
             // ConstVisual
-            truePredicates.Add(new Predicate(PredicateType.ObjectInt, objectIntPredicates.IndexOf(ConstVisual), visuals.IndexOf(obj._Visual)));
+            truePredicates.Add(new Predicate(PredicateType.ObjectInt, objectIntPredicates.IndexOf(ConstVisual), Visuals.IndexOf(obj._Visual)));
 
             // ContainedByConstVisual
             if (Contained(obj))
             {
                 truePredicates.Add(new Predicate(PredicateType.ObjectInt,
-                    objectIntPredicates.IndexOf(ContainedByConstantVisual), visuals.IndexOf(obj.containedBy._Visual)));
+                    objectIntPredicates.IndexOf(ContainedByConstantVisual), Visuals.IndexOf(obj.ContainedBy._Visual)));
             }
 
             // Context predicates
@@ -206,21 +252,21 @@ namespace SZD_ZN8VJ5
             {
                 if (predicate.Invoke(obj, context))
                 {
-                    truePredicates.Add(new Predicate(PredicateType.ObjectContext, index));
+                    truePredicates.Add(new Predicate(PredicateType.Object, index));
                 }
                 ++index;
             }
 
             // Arged context: specific color (0) and specific visual group (1)
-            if (ObjectBelongsToColorGroup(obj, context))
+            if (ObjectBelongsToColorGroup(obj))
             {
-                truePredicates.Add(new Predicate(PredicateType.ObjectContextInt,
-                    objectContextIntPredicates.IndexOf(ObjectBelongsToSpecificColorGroup), obj.regionToColor[0]));
+                truePredicates.Add(new Predicate(PredicateType.ObjectInt,
+                    objectIntPredicates.IndexOf(ObjectBelongsToSpecificColorGroup), obj.RegionToColor[0]));
             }
-            if (ObjectBelongsToVisualGroup(obj, context))
+            if (ObjectBelongsToVisualGroup(obj))
             {
-                truePredicates.Add(new Predicate(PredicateType.ObjectContextInt,
-                    objectContextIntPredicates.IndexOf(ObjectBelongsToSpecificVisualGroup), visuals.IndexOf(obj._Visual)));
+                truePredicates.Add(new Predicate(PredicateType.ObjectInt,
+                    objectIntPredicates.IndexOf(ObjectBelongsToSpecificVisualGroup), Visuals.IndexOf(obj._Visual)));
             }
 
             #region BelongsToShapeGroup_ContainedByConstantVisual
@@ -228,30 +274,25 @@ namespace SZD_ZN8VJ5
             others.Remove(obj);
             if (others.Count > 0)
             {
-                var containers = others.Select(other => other.containedBy).Distinct().ToList();
+                var containers = others.Select(other => other.ContainedBy).Distinct().ToList();
                 containers.Remove(null);
 
                 foreach (var container in containers)
                 {
                     truePredicates.Add(
                         new Predicate(
-                            PredicateType.ObjectContextInt,
-                            objectContextIntPredicates.IndexOf(BelongsToShapeGroup_ContainedByConstantVisual),
-                            visuals.IndexOf(container._Visual)
+                            PredicateType.ObjectInt,
+                            objectIntPredicates.IndexOf(BelongsToShapeGroup_ContainedByConstantVisual),
+                            Visuals.IndexOf(container._Visual)
                         ));
                 }
             }
             #endregion
 
-            return truePredicates;
+            return truePredicates.Distinct().ToList();
         }
-
-        public static ARCObject Execute(Predicate predicate)
-        {
-            return Execute(new List<Predicate>() { predicate });
-        }
-
-        public static ARCObject Execute(List<Predicate> predicates) // *
+    
+        private static ARCObject Execute(List<Predicate> predicates)
         {
             List<ARCObject> all = new List<ARCObject>();
             predicates.ForEach(predicate => all.AddRange(ExecuteReturnAll(predicate)));
@@ -261,20 +302,10 @@ namespace SZD_ZN8VJ5
                 .Select(x => x.Key)
                 .ToList();
 
-            return output.First();
+            return output.First(); // InvalidOpException 
         }
 
-        public static List<ARCObject> AnchorsForGivenRole(List<Predicate> rolePredicates)
-        {
-            foreach (var o in Environment)
-            {
-                bool v = rolePredicates.All(pred => PredicateEngine.ExecuteOnObject(o, pred));
-            }
-
-            return Environment.Where(obj => rolePredicates.All(pred => PredicateEngine.ExecuteOnObject(obj, pred))).ToList();
-        }
-
-        public static bool ExecuteOnObject(ARCObject obj, Predicate predicate)
+        private static bool ExecuteOnObject(ARCObject obj, Predicate predicate)
         {
             switch (predicate.Type)
             {
@@ -282,16 +313,12 @@ namespace SZD_ZN8VJ5
                     return Execute_Object_Predicate(obj, predicate);
                 case PredicateType.ObjectInt:
                     return Execute_Object_Int_Predicate(obj, predicate);
-                case PredicateType.ObjectContext:
-                    return Execute_Object_Context_Predicate(obj, predicate);
-                case PredicateType.ObjectContextInt:
-                    return Execute_Object_Context_Int_Predicate(obj, predicate);
             }
 
             return false;
         }
 
-        public static List<ARCObject> ExecuteReturnAll(Predicate predicate)
+        private static List<ARCObject> ExecuteReturnAll(Predicate predicate)
         {
             List<ARCObject> result = null;
 
@@ -303,10 +330,6 @@ namespace SZD_ZN8VJ5
                     result = Execute_Object_Predicate(predicate); break;
                 case PredicateType.ObjectInt:
                     result = Execute_Object_Int_Predicate(predicate); break;
-                case PredicateType.ObjectContext:
-                    result = Execute_Object_Context_Predicate(predicate); break;
-                case PredicateType.ObjectContextInt:
-                    result = Execute_Object_Context_Int_Predicate(predicate); break;
             }
 
             if (result == null)
@@ -414,12 +437,12 @@ namespace SZD_ZN8VJ5
 
         #region GroupPredicates
         // Only if there is one color group
-        private static bool ObjectBelongsToColorGroup(ARCObject obj, List<ARCObject> context)
+        private static bool ObjectBelongsToColorGroup(ARCObject obj)
         {
             // True only for uni-color objects
-            if (obj.regionToColor.Length == 1)
+            if (obj.RegionToColor.Length == 1)
             {
-                var others = context.Where(x => x.regionToColor.Length == 1).Where(x => x.regionToColor[0] == obj.regionToColor[0]).ToList();
+                var others = Environment.Where(x => x.RegionToColor.Length == 1).Where(x => x.RegionToColor[0] == obj.RegionToColor[0]).ToList();
                 others.Remove(obj);
 
                 return others.Count > 0;
@@ -428,11 +451,11 @@ namespace SZD_ZN8VJ5
         }
 
         // True only for uni-color objects!
-        private static bool UniqueColor(ARCObject obj, List<ARCObject> context)
+        private static bool UniqueColor(ARCObject obj)
         {
-            if (obj.regionToColor.Length == 1)
+            if (obj.RegionToColor.Length == 1)
             {
-                var others = context.Where(x => x.regionToColor.Length == 1).Where(x => x.regionToColor[0] == obj.regionToColor[0]).ToList();
+                var others = Environment.Where(x => x.RegionToColor.Length == 1).Where(x => x.RegionToColor[0] == obj.RegionToColor[0]).ToList();
                 others.Remove(obj);
 
                 return others.Count == 0;
@@ -441,12 +464,12 @@ namespace SZD_ZN8VJ5
         }
 
         // only if there is one specific color group
-        private static bool ObjectBelongsToSpecificColorGroup(ARCObject obj, List<ARCObject> context, int color)
+        private static bool ObjectBelongsToSpecificColorGroup(ARCObject obj, int color)
         {
             // True only for uni-color objects
-            if (obj.regionToColor.Length == 1 && obj.regionToColor[0] == color)
+            if (obj.RegionToColor.Length == 1 && obj.RegionToColor[0] == color)
             {
-                var others = context.Where(x => x.regionToColor.Length == 1 && obj.regionToColor[0] == color).Where(x => x.regionToColor[0] == obj.regionToColor[0]).ToList();
+                var others = Environment.Where(x => x.RegionToColor.Length == 1 && obj.RegionToColor[0] == color).Where(x => x.RegionToColor[0] == obj.RegionToColor[0]).ToList();
                 others.Remove(obj);
 
                 return others.Count > 0;
@@ -454,75 +477,100 @@ namespace SZD_ZN8VJ5
             return false;
         }
 
-        private static bool ObjectBelongsToVisualGroup(ARCObject obj, List<ARCObject> context)
+        private static bool ObjectBelongsToVisualGroup(ARCObject obj)
         {
-            var others = context.Where(x => x.VisualEquals(obj)).ToList();
+            var others = Environment.Where(x => x.VisualEquals(obj)).ToList();
             others.Remove(obj);
             return others.Count > 0;
         }
 
-        private static bool UniqueVisual(ARCObject obj, List<ARCObject> context)
+        private static bool UniqueVisual(ARCObject obj)
         {
-            var others = context.Where(x => x.VisualEquals(obj)).ToList();
+            var others = Environment.Where(x => x.VisualEquals(obj)).ToList();
             others.Remove(obj);
             return others.Count == 0;
         }
 
-        private static bool ObjectBelongsToSpecificVisualGroup(ARCObject obj, List<ARCObject> context, int visualId)
+        private static bool ObjectBelongsToSpecificVisualGroup(ARCObject obj, int visualId)
         {
-            if (obj.VisualEquals(visuals[visualId]))
+            if (obj.VisualEquals(Visuals[visualId]))
             {
-                var others = context.Where(x => x.VisualEquals(visuals[visualId])).ToList();
+                var others = Environment.Where(x => x.VisualEquals(Visuals[visualId])).ToList();
                 others.Remove(obj);
                 return others.Count > 0;
             }
             return false;
         }
-        #endregion
         
+        private static bool IsMax(ARCObject obj)
+        {
+            return Environment.Max(x => x.Sum()) == obj.Sum();
+        }
+
+        private static bool IsMin(ARCObject obj)
+        {
+            return Environment.Min(x => x.Sum()) == obj.Sum();
+        }
+
+        #endregion
+
         #region VisualPredicates
         private static bool ConstVisual(ARCObject obj, int visualId)
         {
-            return obj._Visual.Equals(visuals[visualId]);
+            return obj._Visual.Equals(Visuals[visualId]);
         }
         #endregion
 
         #region ColorPredicates
+
         private static bool HasColor(ARCObject obj, int color)
         {
-            return obj.regionToColor.Contains(color);
+            return obj.RegionToColor.Contains(color);
         }
+
+        private static bool IsMaxColor(ARCObject obj, int color)
+        {
+            if (Array.IndexOf(obj.RegionToColor, color) == -1)
+            {
+                return false;
+            }
+
+
+            var maxColor = Environment.Where(x => Array.IndexOf(x.RegionToColor, color) != -1).OrderByDescending(x => x.Group.RegionCount(Array.IndexOf(x.RegionToColor, color))).First();
+            return obj == maxColor;
+        }
+
         #endregion
 
         #region SimplePredicates
         private static bool Contained(ARCObject obj)
         {
-            return obj.containedBy != null;
+            return obj.ContainedBy != null;
         }
 
         private static bool Container(ARCObject obj)
         {
-            return obj.contains.Count > 0;
+            return obj.ContainedObjects.Count > 0;
         }
 
         private static bool Parent(ARCObject obj)
         {
-            return obj.noiseTo != null;
+            return obj.Parent != null;
         }
 
         private static bool Child(ARCObject obj)
         {
-            return obj.noises.Count > 0;
+            return obj.Noises.Count > 0;
         }
 
         private static bool UniColor(ARCObject obj)
         {
-            return obj.regionToColor.Length == 1;
+            return obj.RegionToColor.Length == 1;
         }
 
         private static bool MultiColor(ARCObject obj)
         {
-            return obj.regionToColor.Length > 1;
+            return obj.RegionToColor.Length > 1;
         }
         #endregion
 
@@ -530,17 +578,17 @@ namespace SZD_ZN8VJ5
 
         private static bool ContainedByConstantVisual(ARCObject obj, int visualId)
         {
-            if (obj.containedBy != null)
+            if (obj.ContainedBy != null)
             {
-                return ConstVisual(obj.containedBy, visualId);
+                return ConstVisual(obj.ContainedBy, visualId);
             }
             return false;
         }
 
-        private static bool BelongsToShapeGroup_ContainedByConstantVisual(ARCObject obj, List<ARCObject> context, int visualId)
+        private static bool BelongsToShapeGroup_ContainedByConstantVisual(ARCObject obj, int visualId)
         {
             //var others = context.Where(x => x.VisualEquals(visuals[visualId])).ToList();
-            var others = context.Where(x => x._Visual.Equals(obj._Visual)).ToList();
+            var others = Environment.Where(x => x._Visual.Equals(obj._Visual)).ToList();
             others.Remove(obj);
             if (others.Count > 0)
             {

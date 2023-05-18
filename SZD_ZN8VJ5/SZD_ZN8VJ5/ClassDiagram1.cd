@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1" MembersFormat="NameAndType">
+  <Class Name="SZD_ZN8VJ5.EquivalenceSaturation">
+    <Position X="1.5" Y="3.75" Width="2.75" />
+    <Members>
+      <Method Name="Add" Hidden="true" />
+      <Field Name="ColorMap" Hidden="true" />
+      <Method Name="GenerateDominantColorExpressions" Hidden="true" />
+      <Method Name="GenerateFlattenGroupExpressions" Hidden="true" />
+      <Method Name="GenerateRotateGroupExpressions" Hidden="true" />
+      <Method Name="NoisesMatch" Hidden="true" />
+      <Field Name="NumberMapHeight" Hidden="true" />
+      <Field Name="NumberMapWidth" Hidden="true" />
+      <Field Name="NumberMapX" Hidden="true" />
+      <Field Name="NumberMapY" Hidden="true" />
+      <Method Name="SaturateColor" Hidden="true" />
+      <Method Name="SaturateEachColor" Hidden="true" />
+      <Method Name="SaturateGroup" Hidden="true" />
+      <Method Name="SaturateNoiseExpressions" Hidden="true" />
+      <Method Name="SaturateNoises" Hidden="true" />
+      <Method Name="SaturateNumber" Hidden="true" />
+      <Method Name="SaturateRegionToColor" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAYgCCAAAgAAAEAAAAABAQAAAYABEAGgAAACgAAUAAA=</HashCode>
+      <FileName>EquivalenceSaturation.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="SZD_ZN8VJ5.ExpressionEngine">
+    <Position X="7.25" Y="3" Width="3" />
+    <Members>
+      <Method Name="ColorMapOf" Hidden="true" />
+      <Method Name="ColorOf" Hidden="true" />
+      <Method Name="ConstNumber" Hidden="true" />
+      <Method Name="DominantColor" Hidden="true" />
+      <Method Name="ExpressionEngine" Hidden="true" />
+      <Method Name="FlattenGroup" Hidden="true" />
+      <Method Name="GroupOf" Hidden="true" />
+      <Method Name="HeightOf" Hidden="true" />
+      <Method Name="NoiseOf" Hidden="true" />
+      <Method Name="NthNoise" Hidden="true" />
+      <Method Name="PredicateToObject" Hidden="true" />
+      <Method Name="RotateLeft" Hidden="true" />
+      <Method Name="RotateRight" Hidden="true" />
+      <Method Name="WidthOf" Hidden="true" />
+      <Method Name="XOf" Hidden="true" />
+      <Method Name="YOf" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAgAEkASAAgAwCAAAABQAAAUEAACAAAAAAAAAgoEIAA=</HashCode>
+      <FileName>ExpressionEngine.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="SZD_ZN8VJ5.PredicateEngine">
+    <Position X="1.5" Y="0.5" Width="4.5" />
+    <Members>
+      <Method Name="AddTruePredicates" Hidden="true" />
+      <Method Name="BelongsToShapeGroup_ContainedByConstantVisual" Hidden="true" />
+      <Method Name="Child" Hidden="true" />
+      <Method Name="ConstVisual" Hidden="true" />
+      <Method Name="Contained" Hidden="true" />
+      <Method Name="ContainedByConstantVisual" Hidden="true" />
+      <Method Name="Container" Hidden="true" />
+      <Method Name="Execute_Object_Context_Int_Predicate" Hidden="true" />
+      <Method Name="Execute_Object_Context_Predicate" Hidden="true" />
+      <Method Name="Execute_Object_Int_Predicate" Hidden="true" />
+      <Method Name="Execute_Object_Predicate" Hidden="true" />
+      <Method Name="ExecuteOnObject" Hidden="true" />
+      <Method Name="ExecuteReturnAll" Hidden="true" />
+      <Method Name="GetUniquePredicates" Hidden="true" />
+      <Method Name="HasColor" Hidden="true" />
+      <Method Name="IsMax" Hidden="true" />
+      <Method Name="MultiColor" Hidden="true" />
+      <Method Name="ObjectBelongsToColorGroup" Hidden="true" />
+      <Method Name="ObjectBelongsToSpecificColorGroup" Hidden="true" />
+      <Method Name="ObjectBelongsToSpecificVisualGroup" Hidden="true" />
+      <Method Name="ObjectBelongsToVisualGroup" Hidden="true" />
+      <Field Name="objectContextIntPredicates" Hidden="true" />
+      <Field Name="objectContextPredicates" Hidden="true" />
+      <Field Name="objectIntPredicates" Hidden="true" />
+      <Field Name="objectPredicates" Hidden="true" />
+      <Method Name="Parent" Hidden="true" />
+      <Method Name="PredicateEngine" Hidden="true" />
+      <Method Name="UniColor" Hidden="true" />
+      <Method Name="UniqueColor" Hidden="true" />
+      <Method Name="UniqueVisual" Hidden="true" />
+      <Field Name="Visuals" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>EyQAQBwCAEAABMQiQACAQAAAsBAQACAADAhBAgAAUQQ=</HashCode>
+      <FileName>PredicateEngine.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="SZD_ZN8VJ5.ProgramInduction">
+    <Position X="4.5" Y="3.75" Width="2.5" />
+    <Members>
+      <Method Name="IndiciesOf" Hidden="true" />
+      <Method Name="Match" Hidden="true" />
+      <Method Name="TestInduce" Hidden="true" />
+    </Members>
+    <NestedTypes>
+      <Class Name="SZD_ZN8VJ5.ProgramInduction.DescriptionFrequency">
+        <TypeIdentifier>
+          <NewMemberFileName>ProgramInduction.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Class>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>AAAAAgAAAAAAAAEAAAAAAAIAAAAAAAAAAAAAAQAgAAA=</HashCode>
+      <FileName>ProgramInduction.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="SZD_ZN8VJ5.Classifier">
+    <Position X="6.5" Y="0.5" Width="3.75" />
+    <Members>
+      <Method Name="AnchorScore" Hidden="true" />
+      <Method Name="FindAnchorObject" Hidden="true" />
+      <Method Name="GetAnchorPredicates" Hidden="true" />
+      <Method Name="Invert" Hidden="true" />
+      <Method Name="IsInverseOtherPredicate" Hidden="true" />
+      <Method Name="IsInversePredicate" Hidden="true" />
+    </Members>
+    <TypeIdentifier>
+      <HashCode>AAAAAEAAAAAAAAgAAAAAIAAAAAAAgAgQAAAAAACAgBA=</HashCode>
+      <FileName>Classifier.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

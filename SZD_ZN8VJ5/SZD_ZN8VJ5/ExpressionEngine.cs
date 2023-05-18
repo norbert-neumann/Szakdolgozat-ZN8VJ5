@@ -1,87 +1,52 @@
-﻿using SZD_ZN8VJ5.Groups;
+﻿using System;
+using System.ComponentModel.Design;
+using System.Linq.Expressions;
+using SZD_ZN8VJ5.Groups;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace SZD_ZN8VJ5
 {
     public enum ExpressionType
     {
-        Number,
-        IntNumber,
-        Group,
-        IntArr,
-        ARCObjArr,
+        Predicate,
+        Xof,
+        Yof,
+        WidthOf,
+        HeightOf,
+        ColorOf,
+        ColorMapOf,
+        NoiseOf,
+        NthNoise,
         ConstNumber,
-        ArcObj,
-        ArcObj_Int,
-        Exp_Int
+        GroupOf,
+        Object,
+        DominantColor,
+        FlattenGroup,
+        RotateRigth,
+        RotateLeft,
+        VerticalReflect,
+        MaxColor,
+        ConstGroup,
+        ClipNoise,
+        Empty
     }
 
     public class Expression
     {
-        public ExpressionType Type;
         public int ExpressionIndex;
         public object[] Arguments;
+        public Type ReturnType;
 
-        public Expression(ExpressionType type, int expressionIndex, object[] arguments)
+        public Expression(Type type, int expressionIndex, object[] arguments)
         {
-            Type = type;
+            ReturnType = type;
             this.ExpressionIndex = expressionIndex;
             Arguments = arguments;
         }
 
         public object Execute()
         {
-            switch (Type)
-            {
-                case ExpressionType.Number: return Execute_NumberExpression();
-                case ExpressionType.IntNumber: return Execute_Int_NumberExpression();
-                case ExpressionType.Group: return Execute_GroupExpression();
-                case ExpressionType.IntArr: return Execute_IntArrExpression();
-                case ExpressionType.ARCObjArr: return Execute_ARCObjArrExpression();
-                case ExpressionType.ConstNumber: return Execute_ConstNumberExpression();
-                case ExpressionType.ArcObj: return Execute_ArcObjExpression();
-                case ExpressionType.ArcObj_Int: return Execute_ArcObj_Int_Expression();
-                case ExpressionType.Exp_Int: return Execute_Exp_Int_Expression();
-            }
-            throw new Exception("Expression Type not found.");
-        }
-
-        private ARCObject Execute_ArcObj_Int_Expression()
-        {
-            return ExpressionEngine.ARCObj_Int_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate, (int)Arguments[1]);
-        }
-
-        private int Execute_Exp_Int_Expression()
-        {
-            return ExpressionEngine.Exp_Number_Expressions[ExpressionIndex].Invoke(Arguments[0] as Expression);
-        }
-
-        private int Execute_NumberExpression()
-        {
-            return ExpressionEngine.Number_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate);
-        }
-        private int Execute_Int_NumberExpression()
-        {
-            return ExpressionEngine.Int_Number_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate, (int)Arguments[1]);
-        }
-        private Group Execute_GroupExpression()
-        {
-            return ExpressionEngine.Group_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate);
-        }
-        private int[] Execute_IntArrExpression()
-        {
-            return ExpressionEngine.IntArr_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate);
-        }
-        private List<ARCObject> Execute_ARCObjArrExpression()
-        {
-            return ExpressionEngine.ARCObjArr_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate);
-        }
-        private int Execute_ConstNumberExpression()
-        {
-            return (int)Arguments[0];
-        }
-        private ARCObject Execute_ArcObjExpression()
-        {
-            return ExpressionEngine.ARCObj_Expressions[ExpressionIndex].Invoke(Arguments[0] as Predicate);
+            return ExpressionEngine.Expressions[ExpressionIndex].Invoke(Arguments);
         }
 
         public override bool Equals(object? obj)
@@ -89,75 +54,87 @@ namespace SZD_ZN8VJ5
             Expression other = obj as Expression;
             if (other != null)
             {
-                return this.Type == other.Type && this.ExpressionIndex == other.ExpressionIndex && this.Arguments.SequenceEqual(other.Arguments);
+                return this.ReturnType == other.ReturnType && this.ExpressionIndex == other.ExpressionIndex && this.Arguments.SequenceEqual(other.Arguments);
             }
             return false;
         }
 
         public override int GetHashCode()
         {
-            return Type.GetHashCode() + ExpressionIndex.GetHashCode() + Arguments.Sum(arg => arg.GetHashCode());
+            return ReturnType.GetHashCode() + ExpressionIndex.GetHashCode() + Arguments.Sum(arg => arg.GetHashCode());
+        }
+
+        public override string ToString()
+        {
+            if (ExpressionIndex == 0)
+            {
+                return Arguments[0].ToString();
+            }
+
+            string result = ExpressionEngine.ExpressionNames[ExpressionIndex];
+
+            // nth_noise_of [ANCHOR] [2]
+
+            if (Arguments.Length == 1)
+            {
+                result += String.Format(" [{0}]", Arguments[0].ToString());
+            }
+            else if (Arguments.Length == 2)
+            {
+                result += String.Format(" [{0}] [{1}]", Arguments[0].ToString(), Arguments[1].ToString());
+            }
+
+
+            return result;
         }
     }
 
     public static class ExpressionEngine
     {
-        public static List<Func<Predicate, int>> Number_Expressions;
-        public static List<Func<Expression, int>> Exp_Number_Expressions;
-        public static List<Func<Predicate, int, int>> Int_Number_Expressions;
-        public static List<Func<Predicate, Group>> Group_Expressions;
-        public static List<Func<Predicate, int[]>> IntArr_Expressions;
-        public static List<Func<Predicate, List<ARCObject>>> ARCObjArr_Expressions;
-        public static List<Func<int, int>> ConstNumber_Expressions;
-        public static List<Func<Predicate, ARCObject>> ARCObj_Expressions;
-        public static List<Func<Predicate, int, ARCObject>> ARCObj_Int_Expressions;
 
+        public static List<Func<object[], object>> Expressions;
+        public static List<Type> ReturnTypes;
+        public static List<string> ExpressionNames;
 
         static ExpressionEngine()
         {
-            Number_Expressions = new List<Func<Predicate, int>>();
-            Int_Number_Expressions = new List<Func<Predicate, int, int>>();
-            Group_Expressions = new List<Func<Predicate, Group>>();
-            IntArr_Expressions = new List<Func<Predicate, int[]>>();
-            ARCObjArr_Expressions = new List<Func<Predicate, List<ARCObject>>>();
-            ConstNumber_Expressions = new List<Func<int, int>>();
-            ARCObj_Expressions = new List<Func<Predicate, ARCObject>>();
-            ARCObj_Int_Expressions = new List<Func<Predicate, int, ARCObject>>();
-            Exp_Number_Expressions = new List<Func<Expression, int>>();
+            Expressions = new List<Func<object[], object>>();
+            ReturnTypes = new List<Type>();
+            ExpressionNames = new List<string>();
 
-            // 0
-            Number_Expressions.Add(XOf);
-            Number_Expressions.Add(YOf);
-            Number_Expressions.Add(WidthOf);
-            Number_Expressions.Add(HeightOf);
+            Expressions.Add(PredicateToObject); ReturnTypes.Add(typeof(ARCObject)); ExpressionNames.Add("predicate");
 
-            // 1
-            Int_Number_Expressions.Add(ColorOf);
+            Expressions.Add(XOf); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("x_of");
+            Expressions.Add(YOf); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("y_of");
+            Expressions.Add(WidthOf); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("width_of");
+            Expressions.Add(HeightOf); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("height_of");
+            Expressions.Add(ColorOf); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("color_of");
 
-            // 2
-            Group_Expressions.Add(GroupOf);
+            Expressions.Add(ColorMapOf); ReturnTypes.Add(typeof(int[])); ExpressionNames.Add("color_map_of");
 
-            // 3
-            IntArr_Expressions.Add(ColorMapOf);
+            Expressions.Add(NoiseOf); ReturnTypes.Add(typeof(List<ARCObject>)); ExpressionNames.Add("noise_of");
+            Expressions.Add(NthNoise); ReturnTypes.Add(typeof(ARCObject)); ExpressionNames.Add("nth_noise_of");
 
-            // 4
-            ARCObjArr_Expressions.Add(NoiseOf);
+            Expressions.Add(ConstNumber); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("const");
 
-            // 5
-            ConstNumber_Expressions.Add(ContsNumber);
+            Expressions.Add(GroupOf); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("shape_of");
 
-            // 6
-            ARCObj_Expressions.Add(PredicateEngine.Execute);
+            Expressions.Add(PredicateToObject); ReturnTypes.Add(typeof(ARCObject)); ExpressionNames.Add("_predicate_");
 
-            // 7
-            ARCObj_Int_Expressions.Add(NthNoise);
+            Expressions.Add(DominantColor); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("dominant_color");
 
-            // 8
-            Exp_Number_Expressions.Add(XOf);
-            Exp_Number_Expressions.Add(YOf);
-            Exp_Number_Expressions.Add(WidthOf);
-            Exp_Number_Expressions.Add(HeightOf);
+            Expressions.Add(FlattenGroup); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("flatten");
 
+            Expressions.Add(RotateRight); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("rotate_right");
+            Expressions.Add(RotateLeft); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("rotate_left");
+            Expressions.Add(VerticalReflect); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("vertical_reflect");
+
+            Expressions.Add(MaxColor); ReturnTypes.Add(typeof(int)); ExpressionNames.Add("max_color");
+
+            Expressions.Add(ConstGroup); ReturnTypes.Add(typeof(Group)); ExpressionNames.Add("const_shape");
+            
+            Expressions.Add(ClipNoise); ReturnTypes.Add(typeof(ARCObject)); ExpressionNames.Add("clip_noise");
+            Expressions.Add(Empty); ReturnTypes.Add(typeof(List<ARCObject>)); ExpressionNames.Add("empty");
         }
 
         public static ARCObject ExecuteArcProgram(ARCProgram program)
@@ -184,87 +161,160 @@ namespace SZD_ZN8VJ5
 
             if (program.NoiseExpr != null) // set noise's anchor
             {
-                obj.noises = (List<ARCObject>)program.NoiseExpr.Execute();
+                obj.Noises = (List<ARCObject>)program.NoiseExpr.Execute();
             }
             else if (program.Noise != null && program.Noise.Count > 0) // set noise's anchor
             {
-                obj.noises = program.Noise.Select(n => ExecuteArcProgram(n)).ToList();
+                int noiseCount = PredicateEngine.CurrentAnchor.Noises.Count;
+                for (int i = 0; i < noiseCount; i++)
+                {
+                    obj.Noises.Add(ExecuteArcProgram(program.Noise[i]));
+                }
+                //obj.Noises = program.Noise.Select(n => ExecuteArcProgram(n)).ToList();
             }
 
             return obj;
         }
 
-        private static int XOf(Predicate predicate)
+        public static Expression Make(ExpressionType type, object[] args)
         {
-            return PredicateEngine.Execute(predicate).x;
+            return new Expression(ReturnTypes[(int)type], (int)type, args);
         }
 
-        private static int XOf(Expression objExpression)
+        public static Expression Make(Predicate predicate)
         {
-            return (objExpression.Execute() as ARCObject).x;
+            return new Expression(typeof(ARCObject), 0, new object[] { predicate });
         }
 
-        private static int YOf(Predicate predicate)
+        private static object XOf(object[] args)
         {
-            return PredicateEngine.Execute(predicate).y;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+            return obj.X;
         }
 
-        private static int YOf(Expression objExpression)
+        private static object YOf(object[] args)
         {
-            return (objExpression.Execute() as ARCObject).y;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+
+            return obj.Y;
         }
 
-        private static int WidthOf(Predicate predicate)
+        private static object WidthOf(object[] args)
         {
-            return PredicateEngine.Execute(predicate).width;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+
+            return obj.Width;
         }
 
-        private static int WidthOf(Expression objExpression)
+        private static object HeightOf(object[] args)
         {
-            return (objExpression.Execute() as ARCObject).width;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+
+            return obj.Height;
         }
 
-        private static int HeightOf(Predicate predicate)
+        private static object GroupOf(object[] args)
         {
-            return PredicateEngine.Execute(predicate).height;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+            return obj.Group;
         }
 
-        private static int HeightOf(Expression objExpression)
+        private static object ColorOf(object[] args)
         {
-            return (objExpression.Execute() as ARCObject).height;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+
+            return obj.RegionToColor[(int)args[1]];
         }
 
-        private static Group GroupOf(Predicate predicate)
+        private static object ColorMapOf(object[] args)
         {
-            return PredicateEngine.Execute(predicate).Group;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+            return obj.RegionToColor;
         }
 
-        private static int ColorOf(Predicate predicate, int region)
+        private static object NoiseOf(object[] args)
         {
-            return PredicateEngine.Execute(predicate).regionToColor[region];
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+
+            return obj.Noises;
         }
 
-        private static int[] ColorMapOf(Predicate predicate)
+        private static object NthNoise(object[] args)
         {
-            return PredicateEngine.Execute(predicate).regionToColor;
+            ARCObject obj = (ARCObject)(args[0] as Expression).Execute();
+            return obj.Noises[(int)args[1]]; // AOORE
         }
 
-        private static List<ARCObject> NoiseOf(Predicate predicate)
+        private static object ConstNumber(object[] args)
         {
-            return PredicateEngine.Execute(predicate).noises;
+            return (int)args[0];
         }
 
-        private static int ContsNumber(int number)
+        private static object ConstGroup(object[] args)
         {
-            return number;
+            return (Group)args[0];
         }
 
-        private static ARCObject NthNoise(Predicate predicate, int index)
+        // object expression
+        private static object PredicateToObject(object[] args)
         {
-            return NoiseOf(predicate)[index];
+            return PredicateEngine.Execute(args[0] as Predicate);
+        } 
+        
+        private static object DominantColor(object[] args)
+        {
+            return DSL.DominantColor((ARCObject)(args[0] as Expression).Execute());
         }
 
+        private static object MaxColor(object[] args)
+        {
+            var obj = (ARCObject)(args[0] as Expression).Execute();
+            return DSL.MaxColor(obj);
+        }
 
+        private static object FlattenGroup(object[] args)
+        {
+            Group grp = (Group)(args[0] as Expression).Execute();
 
+            return DSL.FlattenGroup(grp); 
+        }
+
+        private static object RotateRight(object[] args)
+        {
+            Group grp = (Group)(args[0] as Expression).Execute();
+
+            return DSL.RotateRigth(grp);
+        }
+
+        private static object RotateLeft(object[] args)
+        {
+            Group grp = (Group)(args[0] as Expression).Execute();
+
+            return DSL.RotateLeft(grp);
+        }
+        private static object VerticalReflect(object[] args)
+        {
+            Group grp = (Group)(args[0] as Expression).Execute();
+
+            return DSL.VerticalReflect(grp);
+        }
+
+        private static object ClipNoise(object[] args)
+        {
+            var obj = args[0] as ARCObject;
+            return DSL.ClipOverlappedPart(obj, obj.Noises.First());
+        }
+
+        private static object Empty(object[] args)
+        {
+            return new List<ARCObject>();
+        }
     }
 }

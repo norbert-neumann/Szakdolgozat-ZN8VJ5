@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.3.32901.215
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SZD_ZN8VJ5", "SZD_ZN8VJ5\SZD_ZN8VJ5.csproj", "{26123BE8-67A1-4E6B-845C-C4848A69B26A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SZD_ZN8VJ5", "SZD_ZN8VJ5\SZD_ZN8VJ5.csproj", "{26123BE8-67A1-4E6B-845C-C4848A69B26A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SZD_ZN8VJ5.TESTS", "SZD_ZN8VJ5.TESTS\SZD_ZN8VJ5.TESTS.csproj", "{1F4F7028-3B2D-4B1C-A60F-62F7F1E4CD87}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{26123BE8-67A1-4E6B-845C-C4848A69B26A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{26123BE8-67A1-4E6B-845C-C4848A69B26A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{26123BE8-67A1-4E6B-845C-C4848A69B26A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F4F7028-3B2D-4B1C-A60F-62F7F1E4CD87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F4F7028-3B2D-4B1C-A60F-62F7F1E4CD87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F4F7028-3B2D-4B1C-A60F-62F7F1E4CD87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F4F7028-3B2D-4B1C-A60F-62F7F1E4CD87}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

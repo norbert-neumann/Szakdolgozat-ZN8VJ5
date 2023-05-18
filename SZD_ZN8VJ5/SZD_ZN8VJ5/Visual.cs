@@ -20,8 +20,8 @@ namespace SZD_ZN8VJ5
         public Visual(ARCObject obj)
         {
             Group = obj.Group;
-            Width = obj.width;
-            Height = obj.height;
+            Width = obj.Width;
+            Height = obj.Height;
             //this.regionToColor = obj.regionToColor;
         }
 

@@ -3,6 +3,11 @@ namespace SZD_ZN8VJ5.Groups
 {
     public class PseudoGroup : Group
     {
+        public PseudoGroup(int[,] field, int complexity) : base(complexity)
+        {
+            this.field = field;
+        }
+
         public PseudoGroup(int[,] field, int complexity, List<int> uniqueColors,
             bool isNoise)
             : base(complexity)
